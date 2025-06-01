@@ -1,1 +1,34 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 .env
+
+# Vite
+dist/
+.vite/
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+
+# Build
+build/
+
+# Optional: if you're using socket.io file uploads
+uploads/
+
+# If using ESLint/Prettier caches
+.eslintcache
+.prettiercache
