@@ -1,58 +1,71 @@
-const express = require("express");
-const http = require("http");
-const cors = require("cors");
-const { Server } = require("socket.io");
-
+const express = require('express');
+const http = require('http');
+const cors = require('cors');
+const { Server } = require('socket.io');
+const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(cors());
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // Allow all origins for now; for production, specify client URL
+    origin: "*",
     methods: ["GET", "POST"]
   }
 });
 
 let rooms = {};
 
-io.on("connection", (socket) => {
+io.on('connection', (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("join_room", (roomId) => {
+  socket.on('joinRoom', (roomId) => {
     socket.join(roomId);
+
     if (!rooms[roomId]) {
       rooms[roomId] = { players: [] };
     }
 
-    rooms[roomId].players.push(socket.id);
-    io.to(roomId).emit("room_data", rooms[roomId].players);
+    const players = rooms[roomId].players;
 
-    if (rooms[roomId].players.length === 2) {
-      io.to(roomId).emit("start_game");
+    if (players.length >= 2) {
+      socket.emit('roomFull');
+      return;
+    }
+
+    const playerSymbol = players.length === 0 ? "X" : "O";
+    players.push({ id: socket.id, symbol: playerSymbol });
+
+    socket.emit('playerJoined', { playerSymbol });
+  });
+
+  socket.on('makeMove', ({ roomId, board, turn }) => {
+    socket.to(roomId).emit('updateGame', { board, turn });
+  });
+
+  socket.on('restartGame', (roomId) => {
+    io.to(roomId).emit('gameRestarted');
+  });
+
+  socket.on('disconnecting', () => {
+    const joinedRooms = Array.from(socket.rooms).filter(r => r !== socket.id);
+    for (const roomId of joinedRooms) {
+      const room = rooms[roomId];
+      if (room) {
+        room.players = room.players.filter(p => p.id !== socket.id);
+        if (room.players.length === 0) {
+          delete rooms[roomId];
+        }
+      }
     }
   });
 
-  socket.on("make_move", ({ roomId, board, turn }) => {
-    socket.to(roomId).emit("receive_move", { board, turn });
-  });
-
-  socket.on("disconnecting", () => {
-    const roomsJoined = [...socket.rooms].filter(r => r !== socket.id);
-    roomsJoined.forEach(roomId => {
-      if (rooms[roomId]) {
-        rooms[roomId].players = rooms[roomId].players.filter(p => p !== socket.id);
-        if (rooms[roomId].players.length === 0) {
-          delete rooms[roomId];
-        } else {
-          io.to(roomId).emit("room_data", rooms[roomId].players);
-        }
-      }
-    });
+  socket.on('disconnect', () => {
+    console.log("User disconnected:", socket.id);
   });
 });
 
-const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
