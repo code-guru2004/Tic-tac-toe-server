@@ -37,6 +37,11 @@ io.on('connection', (socket) => {
     players.push({ id: socket.id, symbol: playerSymbol });
 
     socket.emit('playerJoined', { playerSymbol });
+
+    // If second player just joined, send initial game state to both
+    if (players.length === 2) {
+      io.to(roomId).emit('updateGame', { board: Array(9).fill(""), turn: "X" });
+    }
   });
 
   socket.on('makeMove', ({ roomId, board, turn }) => {
