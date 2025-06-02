@@ -3,6 +3,7 @@ const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
 const PORT = process.env.PORT || 3000;
+
 const app = express();
 app.use(cors());
 
@@ -36,15 +37,22 @@ io.on('connection', (socket) => {
     const playerSymbol = players.length === 0 ? "X" : "O";
     players.push({ id: socket.id, symbol: playerSymbol });
 
-    socket.emit('playerJoined', { playerSymbol });
+    socket.emit('playerJoined', { playerSymbol, playersInRoom: players.length });
 
-    // If second player just joined, send initial game state to both
+    // Notify both players how many have joined
+    io.to(roomId).emit('playersUpdate', { playersInRoom: players.length });
+
     if (players.length === 2) {
       io.to(roomId).emit('updateGame', { board: Array(9).fill(""), turn: "X" });
     }
   });
 
   socket.on('makeMove', ({ roomId, board, turn }) => {
+    const players = rooms[roomId]?.players || [];
+
+    // Only allow moves if both players are present
+    if (players.length < 2) return;
+
     socket.to(roomId).emit('updateGame', { board, turn });
   });
 
@@ -60,6 +68,9 @@ io.on('connection', (socket) => {
         room.players = room.players.filter(p => p.id !== socket.id);
         if (room.players.length === 0) {
           delete rooms[roomId];
+        } else {
+          // Notify remaining player of player count
+          io.to(roomId).emit('playersUpdate', { playersInRoom: room.players.length });
         }
       }
     }
@@ -73,4 +84,3 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
